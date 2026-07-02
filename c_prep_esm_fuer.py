@@ -379,3 +379,232 @@ with tab_view:
             )
         else:
             st.info("No hay datos que coincidan con la búsqueda.")
+
+
+
+# ********************************************************************************************************
+# ********************************************************************************************************
+# --- PESTAÑA: EDITAR ---
+# ********************************************************************************************************
+# ********************************************************************************************************
+with tab_edit:
+    df_editar = cargar_datos2()
+    st.markdown("<h3 style='text-align: center; color:darkblue ;'>✏️ EDITAR REGISTRO EXISTENTE</h3>", unsafe_allow_html=True)
+    
+    if df_editar.empty:
+        st.warning("📭 No hay registros disponibles para editar.")
+    else:
+        
+        
+        # Selector de ID para editar
+        lista_ids = df_editar["ID"].tolist()
+        id_seleccionar = st.selectbox("Selecciona el ID del registro que deseas EDITAR:", options=lista_ids, key="sb_id_editar")
+        
+        # Obtener los datos del registro seleccionado
+        registro_idx = df_editar[df_editar["ID"] == id_seleccionar].index[0]
+        reg_actual = df_editar.loc[registro_idx]
+        
+        # --- FORMULARIO DE EDICIÓN DE DATOS ---
+        # BATCH
+        batch_val_defecto = str(reg_actual.get("BATCH_PREP", reg_actual.get("BATCH_PREP_FUER", "")))
+        batch_texto_ed = st.text_input('BATCH (No.)', value=batch_val_defecto, placeholder="Ingresa el número de BATCH", key="ti_batch_ed")
+        try:
+            batch_preparadof_ed = float(batch_texto_ed.replace(',', '.')) if batch_texto_ed else 0.000
+        except ValueError:
+            batch_preparadof_ed = 0.000
+            st.error("⚠️ Por favor, ingresa un número válido en el BATCH.")
+            
+        # COLOR
+        color_val_defecto = reg_actual.get("COLOR_PREP", reg_actual.get("COLOR_PREP_FUER", OPCIONES_COLOR_PREPARADO_FUERTE[0]))
+        if color_val_defecto in OPCIONES_COLOR_PREPARADO_FUERTE:
+            idx_color = OPCIONES_COLOR_PREPARADO_FUERTE.index(color_val_defecto)
+        else:
+            idx_color = 0
+        color_preparadof_ed = st.selectbox("COLOR", OPCIONES_COLOR_PREPARADO_FUERTE, index=idx_color, key="sb_color_ed")
+        
+        # TIPO DE ESMALTE
+        tipo_val_defecto = reg_actual.get("TIPO_ESMALTE_PREP", reg_actual.get("TIPO_ESMALTE_PREP_FUER", OPCIONES_TIPO_ESMALTE_PREPARADO_FUERTE[0]))
+        if tipo_val_defecto in OPCIONES_TIPO_ESMALTE_PREPARADO_FUERTE:
+            idx_tipo = OPCIONES_TIPO_ESMALTE_PREPARADO_FUERTE.index(tipo_val_defecto)
+        else:
+            idx_tipo = 0
+        tipo_esmalte_preparadof_ed = st.selectbox("TIPO DE ESMALTE", OPCIONES_TIPO_ESMALTE_PREPARADO_FUERTE, index=idx_tipo, key="sb_tipo_ed")
+        
+        # VOLUMEN DE LA MEDICIÓN
+        vol_val_defecto = str(reg_actual["VOLUMEN(L)_PREP_FUER"])
+        volumen_texto_ed = st.text_input('VOLUMEN (L)', value=vol_val_defecto, placeholder="Ingresa el volumen en litros", key="ti_vol_ed")
+        try:
+            volumen_preparadof_ed = float(volumen_texto_ed.replace(',', '.')) if volumen_texto_ed else 0.000
+        except ValueError:
+            volumen_preparadof_ed = 0.000
+            st.error("⚠️ Por favor, ingresa un número válido en el VOLUMEN.")
+            
+        # DENSIDAD DE LA MEDICIÓN
+        dens_val_defecto = str(reg_actual["DENSIDAD(KG/L)_PREP_FUER"])
+        densidad_texto_ed = st.text_input('DENSIDAD (Kg/lt³)', value=dens_val_defecto, placeholder="Ingresa la densidad en Kg/lt³", key="ti_dens_ed")
+        try:
+            densidad_preparadof_ed = float(densidad_texto_ed.replace(',', '.')) if densidad_texto_ed else 0.000
+        except ValueError:
+            densidad_preparadof_ed = 0.000
+            st.error("⚠️ Por favor, ingresa un número válido en la DENSIDAD.")
+            
+        # PARTE RECUPERADA EN %
+        pct_val_defecto = str(reg_actual["%_RECUPERADOS_PREP_FUER"])
+        porcentaje_recuperada_texto_ed = st.text_input('PARTE RECUPERADA (%)', value=pct_val_defecto, placeholder="Ingresa la parte recuperada en porcentaje", key="ti_pct_ed")
+        porcentaje_recuperadaf_ed = float(porcentaje_recuperada_texto_ed.replace(',', '.')) if porcentaje_recuperada_texto_ed else 0.000
+        
+        # --- BLOQUE DE CÁLCULOS EN TIEMPO REAL ---
+        kg_humedos_preparadof_ed = volumen_preparadof_ed * densidad_preparadof_ed  # Peso final en Kg
+        pendiente = 1.5816 
+        ordenada_origen = -1.5791 
+        kg_preparadof_secos_ed = volumen_preparadof_ed * ((pendiente * densidad_preparadof_ed) + ordenada_origen)  # Peso seco en Kg
+        kg_virgenf_ed = kg_preparadof_secos_ed * (100 - porcentaje_recuperadaf_ed) / 100
+        kg_recuperadosf_ed = kg_preparadof_secos_ed - kg_virgenf_ed  # Parte recuperada en Kg
+
+        # --- MOSTRAR RESULTADOS EN PANTALLA ---
+        st.info(f"📐 **Kilogramos Húmedos (Kg):** {kg_humedos_preparadof_ed:.2f}")
+        st.info(f"📐 **Kilogramos Secos (Kg):** {kg_preparadof_secos_ed:.2f}")
+        st.info(f"📐 **Kilogramos Virgen (Kg):** {kg_virgenf_ed:.2f}")
+        st.info(f"📐 **Kilogramos Recuperados (Kg):** {kg_recuperadosf_ed:.2f}")
+
+        # Inicializar la variable de estado para la confirmación si no existe
+        if "confirmar_edicion" not in st.session_state:
+            st.session_state.confirmar_edicion = False
+            
+        # Botón principal para iniciar el proceso de guardado (edición)
+        btn_edit_save = st.button("Actualizar Registro", disabled=st.session_state.confirmar_edicion, key="btn_edit_main")
+        if btn_edit_save:
+            # FILTRO DE VALIDACION DE DATOS PREVIO
+            if not batch_preparadof_ed or not color_preparadof_ed or not volumen_preparadof_ed or not densidad_preparadof_ed:
+                st.error("⚠️ Error: Por favor completa los campos de Batch, Color, Volumen y Densidad.")
+            else:
+                # Activamos el modo de confirmación
+                st.session_state.confirmar_edicion = True
+                st.rerun()
+
+        # --- BLOQUE DE CONFIRMACIÓN (SÍ / NO) ---
+        if st.session_state.confirmar_edicion:
+            st.warning(f"❓ ¿Está seguro de que desea actualizar el Registro No. {id_seleccionar}?")
+            
+            # Colocamos los dos botones uno al lado del otro
+            col_si_ed, col_no_ed = st.columns(2)
+            
+            with col_si_ed:
+                btn_si_ed = st.button("✔️ SÍ, actualizar", use_container_width=True, key="btn_si_ed")
+            with col_no_ed:
+                btn_no_ed = st.button("❌ NO, cancelar", use_container_width=True, key="btn_no_ed")
+                
+            if btn_si_ed:
+                # --- CONSTRUCCIÓN DEL REGISTRO CORREGIDO ---
+                df_editar.loc[registro_idx, "BATCH_PREP"] = batch_preparadof_ed
+                df_editar.loc[registro_idx, "COLOR_PREP"] = color_preparadof_ed
+                df_editar.loc[registro_idx, "TIPO_ESMALTE_PREP"] = tipo_esmalte_preparadof_ed
+                df_editar.loc[registro_idx, "VOLUMEN(L)_PREP_FUER"] = volumen_preparadof_ed
+                df_editar.loc[registro_idx, "KG_HUMEDOS_PREP_FUER"] = kg_humedos_preparadof_ed
+                df_editar.loc[registro_idx, "DENSIDAD(KG/L)_PREP_FUER"] = densidad_preparadof_ed
+                df_editar.loc[registro_idx, "KG_SECOS_PREP"] = kg_preparadof_secos_ed
+                df_editar.loc[registro_idx, "KG_VIRGEN_PREP_FUER"] = kg_virgenf_ed
+                df_editar.loc[registro_idx, "%_RECUPERADOS_PREP_FUER"] = porcentaje_recuperadaf_ed
+                df_editar.loc[registro_idx, "KG_RECUPERADOS_PREP_FUER"] = kg_recuperadosf_ed
+                
+                # Guardado
+                guardar_datos2(df_editar)
+                # Éxito y limpieza de estado
+                st.success(f"✅ Registro #{id_seleccionar} actualizado exitosamente.")
+                st.session_state.confirmar_edicion = False
+                time.sleep(2)
+                st.rerun()
+                
+            if btn_no_ed:
+                # Cancelar acción y reestablecer la vista normal
+                st.session_state.confirmar_edicion = False
+                st.rerun()
+
+
+
+
+# ********************************************************************************************************
+# ********************************************************************************************************
+# --- PESTAÑA: ELIMINAR ---
+# ********************************************************************************************************
+# ********************************************************************************************************
+with tab_del:
+    df_eliminar = cargar_datos2()
+    st.markdown("<h3 style='text-align: center; color:darkred ;'>🗑️ ELIMINAR REGISTRO</h3>", unsafe_allow_html=True)
+    
+    if df_eliminar.empty:
+        st.warning("📭 No hay registros disponibles para eliminar.")
+    else:
+        
+        
+        # Selector de ID para eliminar
+        lista_ids_del = df_eliminar["ID"].tolist()
+        id_seleccionar_del = st.selectbox("Selecciona el ID del registro que deseas ELIMINAR:", options=lista_ids_del, key="sb_id_eliminar")
+        
+        # Obtener y mostrar la información actual antes de borrar en forma de Tabla
+        df_registro_actual = df_eliminar[df_eliminar["ID"] == id_seleccionar_del]
+        
+        # Columnas a mostrar en la previsualización de eliminación
+        columnas_resumen_del = [
+            "ID",
+            "BATCH_PREP",
+            "COLOR_PREP",
+            "TIPO_ESMALTE_PREP",
+            "VOLUMEN(L)_PREP_FUER",
+            "KG_HUMEDOS_PREP_FUER",
+            "DENSIDAD(KG/L)_PREP_FUER",
+            "KG_SECOS_PREP",
+            "KG_VIRGEN_PREP_FUER",
+            "%_RECUPERADOS_PREP_FUER",
+            "KG_RECUPERADOS_PREP_FUER",
+        ]
+        
+        # Aseguramos filtrar solo las columnas que existan en el DataFrame actual
+        columnas_filtradas_del = [col for col in columnas_resumen_del if col in df_registro_actual.columns]
+        
+        st.markdown("##### 📋 Datos del Registro Seleccionado:")
+        st.dataframe(
+            df_registro_actual[columnas_filtradas_del].style.format(precision=2),
+            use_container_width=True,
+            hide_index=True
+        )
+
+        # Inicializar la variable de estado para la confirmación si no existe
+        if "confirmar_eliminacion" not in st.session_state:
+            st.session_state.confirmar_eliminacion = False
+            
+        # Botón principal para iniciar el proceso de eliminación
+        btn_del_main = st.button("Eliminar Registro", disabled=st.session_state.confirmar_eliminacion, key="btn_del_main")
+        if btn_del_main:
+            # Activamos el modo de confirmación
+            st.session_state.confirmar_eliminacion = True
+            st.rerun()
+
+        # --- BLOQUE DE CONFIRMACIÓN (SÍ / NO) ---
+        if st.session_state.confirmar_eliminacion:
+            st.error(f"⚠️ ¿Está completamente seguro de que desea ELIMINAR permanentemente el Registro No. {id_seleccionar_del}?")
+            
+            # Colocamos los dos botones uno al lado del otro
+            col_si_del, col_no_del = st.columns(2)
+            
+            with col_si_del:
+                btn_si_del = st.button("✔️ SÍ, eliminar", use_container_width=True, key="btn_si_del")
+            with col_no_del:
+                btn_no_del = st.button("❌ NO, cancelar", use_container_width=True, key="btn_no_del")
+                
+            if btn_si_del:
+                # Filtrar el DataFrame para remover el registro con el ID seleccionado
+                df_final_del = df_eliminar[df_eliminar["ID"] != id_seleccionar_del]
+                
+                # Guardado
+                guardar_datos2(df_final_del)
+                # Éxito y limpieza de estado
+                st.success(f"🗑️ Registro #{id_seleccionar_del} eliminado exitosamente.")
+                st.session_state.confirmar_eliminacion = False
+                time.sleep(2)
+                st.rerun()
+                
+            if btn_no_del:
+                # Cancelar acción y reestablecer la vista normal
+                st.session_state.confirmar_eliminacion = False
+                st.rerun()

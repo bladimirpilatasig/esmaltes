@@ -136,7 +136,7 @@ with tab_add:
     # NUMERO DE CONSUMO
     consumo_texto = st.text_input('NÚMERO DE CONSUMO', value="", placeholder="Ingresa el número de consumo")
     try:
-        consumo_egreso_in = int(consumo_texto) if consumo_texto else 0
+        consumo_egreso_in = float(consumo_texto.replace(',', '.')) if consumo_texto else 0.000
     except ValueError:
         consumo_egreso_in = 0
         st.error("⚠️ Por favor, ingresa un número válido en el NÚMERO DE CONSUMO.")
@@ -158,7 +158,8 @@ with tab_add:
     btn_save = st.button("Guardar Registro", disabled=st.session_state.confirmar_guardado)
     if btn_save:
         # FILTRO DE VALIDACION DE DATOS PREVIO
-        if not fecha_egreso_in or not tipo_esmalte_egreso_in or not consumo_egreso_in or not cantidad_egreso_in:
+        # Validamos que los textos no estén vacíos en vez de evaluar si el número es 0
+        if not fecha_egreso_in or not tipo_esmalte_egreso_in or consumo_texto.strip() == "" or cantidad_egreso_texto.strip() == "":
             st.error("⚠️ Error: Por favor completa todos los campos.")
         else:
             # Activamos el modo de confirmación
@@ -367,3 +368,180 @@ with tab_view:
             )
         else:
             st.info("No hay datos que coincidan con la búsqueda.")
+
+
+
+
+
+# ********************************************************************************************************
+# ********************************************************************************************************
+# --- PESTAÑA: EDITAR ---
+# ********************************************************************************************************
+# ********************************************************************************************************
+with tab_edit:
+    df_editar = cargar_datos4()
+    st.markdown("<h3 style='text-align: center; color:darkblue ;'>✏️ EDITAR REGISTRO EXISTENTE</h3>", unsafe_allow_html=True)
+    
+    
+    if df_editar.empty:
+        st.warning("📭 No hay registros guardados para editar.")
+    else:
+        
+        # Selectbox para elegir el ID a editar
+        lista_ids_edit = df_editar["ID"].tolist()
+        id_seleccionar_edit = st.selectbox("Seleccione el ID del registro que desea editar:", options=lista_ids_edit, key="sb_id_editar")
+        
+        # Obtener la fila actual del ID seleccionado
+        fila_editar = df_editar[df_editar["ID"] == id_seleccionar_edit].iloc[0]
+        
+        # --- FORMULARIO DE EDICIÓN (Cargado con los datos actuales) ---
+        # FECHA: Convertimos de str a objeto datetime.date para el st.date_input
+        try:
+            fecha_actual_dt = datetime.datetime.strptime(str(fila_editar["FECHA_EGRESO"]), "%d/%m/%Y").date()
+        except ValueError:
+            fecha_actual_dt = datetime.date.today()
+            
+        fecha_egreso_edit = st.date_input("FECHA (EDICIÓN)", value=fecha_actual_dt, format="DD/MM/YYYY", key="date_edit")
+        
+        # BATCH
+        batch_egreso_edit_text = st.text_input('BATCH (No.) (EDICIÓN)', value=str(fila_editar["BATCH_EGRESO"]), key="txt_batch_edit")
+        try:
+            batch_egreso_edit_val = float(batch_egreso_edit_text.replace(',', '.')) if batch_egreso_edit_text else 0.000
+        except ValueError:
+            batch_egreso_edit_val = 0.000
+            st.error("⚠️ Por favor, ingresa un número válido en el BATCH.")
+            
+        # COLOR: Buscamos el índice actual en tus opciones globales
+        color_actual = str(fila_editar["COLOR_EGRESO"])
+        idx_color = OPCIONES_COLOR_EGRESO.index(color_actual) if color_actual in OPCIONES_COLOR_EGRESO else 0
+        color_egreso_edit = st.selectbox("COLOR (EDICIÓN)", OPCIONES_COLOR_EGRESO, index=idx_color, key="sb_color_edit")
+        
+        # TIPO DE ESMALTE
+        tipo_actual = str(fila_editar["TIPO_ESMALTE_EGRESO"])
+        idx_tipo = OPCIONES_TIPO_ESMALTE_EGRESO.index(tipo_actual) if tipo_actual in OPCIONES_TIPO_ESMALTE_EGRESO else 0
+        tipo_esmalte_egreso_edit = st.selectbox("TIPO DE ESMALTE (EDICIÓN)", OPCIONES_TIPO_ESMALTE_EGRESO, index=idx_tipo, key="sb_tipo_edit")
+        
+        # NÚMERO DE CONSUMO
+        consumo_edit_text = st.text_input('NÚMERO DE CONSUMO (EDICIÓN)', value=str(fila_editar["NUMERO_CONSUMO_EGRESO"]), key="txt_cons_edit")
+        try:
+            consumo_egreso_edit_val = float(consumo_edit_text.replace(',', '.')) if consumo_edit_text else 0.000
+        except ValueError:
+            consumo_egreso_edit_val = 0.000
+            st.error("⚠️ Por favor, ingresa un número válido en el NÚMERO DE CONSUMO.")
+            
+        # CANTIDAD DE CONSUMO
+        cantidad_edit_text = st.text_input('CANTIDAD DE CONSUMO (litros) (EDICIÓN)', value=str(fila_editar["CANTIDAD_CONSUMO_EGRESO"]), key="txt_cant_edit")
+        try:
+            cantidad_egreso_edit_val = float(cantidad_edit_text.replace(',', '.')) if cantidad_edit_text else 0.000
+        except ValueError:
+            cantidad_egreso_edit_val = 0.000
+            st.error("⚠️ Por favor, ingresa un número válido en la CANTIDAD DE CONSUMO.")
+            
+        # Inicializar estado para confirmación de edición
+        if "confirmar_edicion" not in st.session_state:
+            st.session_state.confirmar_edicion = False
+            
+        btn_update = st.button("Actualizar Registro", disabled=st.session_state.confirmar_edicion, key="btn_update_main")
+        
+        if btn_update:
+            if not fecha_egreso_edit or not tipo_esmalte_egreso_edit or consumo_edit_text.strip() == "" or cantidad_edit_text.strip() == "":
+                st.error("⚠️ Error: Por favor completa todos los campos para actualizar.")
+            else:
+                st.session_state.confirmar_edicion = True
+                st.rerun()
+                
+        # --- BLOQUE DE CONFIRMACIÓN DE EDICIÓN ---
+        if st.session_state.confirmar_edicion:
+            st.warning(f"❓ ¿Está seguro de que desea guardar los cambios en el Registro No. {id_seleccionar_edit}?")
+            col_si_ed, col_no_ed = st.columns(2)
+            
+            with col_si_ed:
+                btn_si_ed = st.button("✔️ SÍ, actualizar", use_container_width=True, key="btn_si_ed")
+            with col_no_ed:
+                btn_no_ed = st.button("❌ NO, cancelar", use_container_width=True, key="btn_no_ed")
+                
+            if btn_si_ed:
+                # Modificamos la fila correspondiente en el DataFrame
+                df_editar.loc[df_editar["ID"] == id_seleccionar_edit, "FECHA_EGRESO"] = fecha_egreso_edit.strftime("%d/%m/%Y")
+                df_editar.loc[df_editar["ID"] == id_seleccionar_edit, "BATCH_EGRESO"] = batch_egreso_edit_val
+                df_editar.loc[df_editar["ID"] == id_seleccionar_edit, "COLOR_EGRESO"] = color_egreso_edit
+                df_editar.loc[df_editar["ID"] == id_seleccionar_edit, "TIPO_ESMALTE_EGRESO"] = tipo_esmalte_egreso_edit
+                df_editar.loc[df_editar["ID"] == id_seleccionar_edit, "NUMERO_CONSUMO_EGRESO"] = consumo_egreso_edit_val
+                df_editar.loc[df_editar["ID"] == id_seleccionar_edit, "CANTIDAD_CONSUMO_EGRESO"] = cantidad_egreso_edit_val
+                
+                guardar_datos4(df_editar)
+                st.success(f"✅ Registro #{id_seleccionar_edit} actualizado exitosamente.")
+                st.session_state.confirmar_edicion = False
+                time.sleep(2)
+                st.rerun()
+                
+            if btn_no_ed:
+                st.session_state.confirmar_edicion = False
+                st.rerun()
+
+
+
+
+
+# ********************************************************************************************************
+# ********************************************************************************************************
+# --- PESTAÑA: ELIMINAR ---
+# ********************************************************************************************************
+# ********************************************************************************************************
+with tab_del:
+    df_eliminar = cargar_datos4()
+    st.markdown("<h3 style='text-align: center; color:darkred ;'>🗑️ ELIMINAR REGISTRO</h3>", unsafe_allow_html=True)
+    
+    if df_eliminar.empty:
+        st.warning("📭 No hay registros guardados para eliminar.")
+    else:
+        
+        
+        # Selectbox para elegir el ID a borrar
+        lista_ids_del = df_eliminar["ID"].tolist()
+        id_seleccionar_del = st.selectbox("Seleccione el ID del registro que desea eliminar:", options=lista_ids_del, key="sb_id_eliminar")
+        
+        # Filtrar y extraer la fila en un DataFrame individual para mostrarlo como tabla previa
+        fila_eliminar_df = df_eliminar[df_eliminar["ID"] == id_seleccionar_del]
+        
+        st.write("📋 **Vista previa del registro seleccionado para eliminar:**")
+        # Mostrar el registro en formato tabla limpia
+        st.dataframe(
+            fila_eliminar_df.style.format(precision=0),
+            use_container_width=True,
+            hide_index=True
+        )
+        
+        # Inicializar estado para confirmación de eliminación
+        if "confirmar_eliminacion" not in st.session_state:
+            st.session_state.confirmar_eliminacion = False
+            
+        btn_delete = st.button("Eliminar Registro", disabled=st.session_state.confirmar_eliminacion, key="btn_del_main")
+        
+        if btn_delete:
+            st.session_state.confirmar_eliminacion = True
+            st.rerun()
+            
+        # --- BLOQUE DE CONFIRMACIÓN DE ELIMINACIÓN ---
+        if st.session_state.confirmar_eliminacion:
+            st.error(f"🚨 ALERTA: ¿Está completamente seguro de que desea ELIMINAR permanentemente el Registro No. {id_seleccionar_del}?")
+            col_si_del, col_no_del = st.columns(2)
+            
+            with col_si_del:
+                btn_si_del = st.button("💥 SÍ, eliminar definitivamente", use_container_width=True, key="btn_si_del")
+            with col_no_del:
+                btn_no_del = st.button("❌ NO, cancelar", use_container_width=True, key="btn_no_del")
+                
+            if btn_si_del:
+                # Filtrar el DataFrame manteniendo todos los registros menos el ID seleccionado
+                df_final_del = df_eliminar[df_eliminar["ID"] != id_seleccionar_del]
+                guardar_datos4(df_final_del)
+                
+                st.success(f"🗑️ Registro #{id_seleccionar_del} eliminado correctamente.")
+                st.session_state.confirmar_eliminacion = False
+                time.sleep(2)
+                st.rerun()
+                
+            if btn_no_del:
+                st.session_state.confirmar_eliminacion = False
+                st.rerun()

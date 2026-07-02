@@ -318,3 +318,183 @@ with tab_view:
             )
         else:
             st.info("No hay datos que coincidan con la búsqueda.")
+
+
+
+
+
+
+# ********************************************************************************************************
+# ********************************************************************************************************
+# --- PESTAÑA: EDITAR REGISTRO ---
+# ********************************************************************************************************
+# ********************************************************************************************************
+with tab_edit:
+    st.write("")
+    st.markdown("<h3 style='text-align: center; color:darkblue ;'>✏️ EDITAR REGISTRO EXISTENTE</h3>", unsafe_allow_html=True)
+    df_editar = cargar_datos1()
+
+    if df_editar.empty:
+        st.warning("📭 No hay registros para editar.")
+    else:
+        # Selector de ID a editar
+        lista_ids = df_editar["ID"].tolist()
+        id_a_editar = st.selectbox("Selecciona el ID del registro que deseas editar:", options=lista_ids, key="sb_id_editar")
+
+        # Extraer los datos actuales del registro seleccionado
+        fila_actual = df_editar[df_editar["ID"] == id_a_editar].iloc[0]
+
+        # --- FORMULARIO CON DATOS PRECARGADOS ---
+        # BATCH
+        batch_editar_texto = st.text_input('BATCH (No.)', value=str(fila_actual["BATCH_PREP"]), placeholder="Ingresa el número de BATCH", key="edit_batch")
+        try:
+            batch_preparadop_edit = float(batch_editar_texto.replace(',', '.')) if batch_editar_texto else 0.000
+        except ValueError:
+            batch_preparadop_edit = 0.000
+            st.error("⚠️ Por favor, ingresa un número válido en el BATCH.")
+
+        # COLOR
+        idx_color = OPCIONES_COLOR_PREPARADO.index(fila_actual["COLOR_PREP"]) if fila_actual["COLOR_PREP"] in OPCIONES_COLOR_PREPARADO else 0
+        color_preparadop_edit = st.selectbox("COLOR", OPCIONES_COLOR_PREPARADO, index=idx_color, key="edit_color")
+
+        # TIPO DE ESMALTE
+        idx_tipo = OPCIONES_TIPO_ESMALTE_PREPARADO.index(fila_actual["TIPO_ESMALTE_PREP"]) if fila_actual["TIPO_ESMALTE_PREP"] in OPCIONES_TIPO_ESMALTE_PREPARADO else 0
+        tipo_esmalte_preparadop_edit = st.selectbox("TIPO DE ESMALTE", OPCIONES_TIPO_ESMALTE_PREPARADO, index=idx_tipo, key="edit_tipo")
+
+        # ALTURA DE LA MEDICIÓN
+        altura_editar_texto = st.text_input('ALTURA (cm)', value=str(fila_actual["ALTURA_PREP"]), placeholder="Ingresa la altura en centímetros", key="edit_altura")
+        try:
+            altura_preparadop_edit = float(altura_editar_texto.replace(',', '.')) if altura_editar_texto else 0.000
+        except ValueError:
+            altura_preparadop_edit = 0.000
+            st.error("⚠️ Por favor, ingresa un número válido en la ALTURA.")
+
+        # DENSIDAD DE LA MEDICIÓN
+        densidad_editar_texto = st.text_input('DENSIDAD (Kg/lt)', value=str(fila_actual["DENSIDAD(KG/L)_PREP"]), placeholder="Ingresa la densidad en Kg/lt", key="edit_densidad")
+        try:
+            densidad_preparadop_edit = float(densidad_editar_texto.replace(',', '.')) if densidad_editar_texto else 0.000
+        except ValueError:
+            densidad_preparadop_edit = 0.000
+            st.error("⚠️ Por favor, ingresa un número válido en la DENSIDAD.")
+
+        # --- BLOQUE DE CÁLCULOS EN TIEMPO REAL ---
+        pi = 3.141592653589793
+        diametro = 1.925
+        altura_calc_edit = 1.44 - (altura_preparadop_edit / 100)
+        area_calc_edit = (pi * (diametro ** 2)) / 4
+        volumen_calc_edit = area_calc_edit * altura_calc_edit * 1000
+        volumen_fij0 = 240
+        correccion = -32
+        volumen_preparadop_final_edit = volumen_calc_edit + volumen_fij0 + correccion
+        kg_humedos_preparadop_cal_edit = volumen_preparadop_final_edit * densidad_preparadop_edit
+        pendiente = 1.5419
+        ordenada_origen = -1.5435
+        kg_preparadop_secos_edit = volumen_preparadop_final_edit * ((pendiente * densidad_preparadop_edit) + ordenada_origen)
+
+        # --- MOSTRAR RESULTADOS EN PANTALLA ---
+        st.info(f"📐 **Volumen final calculado:** {volumen_preparadop_final_edit:.2f} litros")
+        st.info(f"📐 **Kilogramos Húmedos (Kg) calculados:** {kg_humedos_preparadop_cal_edit:.2f}")
+        st.info(f"📐 **Kilogramos Secos (Kg) calculados:** {kg_preparadop_secos_edit:.2f}")
+
+        # Inicializar la variable de estado para la confirmación si no existe
+        if "confirmar_edicion" not in st.session_state:
+            st.session_state.confirmar_edicion = False
+
+        # Botón principal para iniciar el proceso de edición
+        btn_update = st.button("Actualizar Registro", disabled=st.session_state.confirmar_edicion, key="btn_actualizar")
+        if btn_update:
+            if not batch_preparadop_edit or not color_preparadop_edit or not altura_preparadop_edit or not densidad_preparadop_edit:
+                st.error("⚠️ Error: Por favor completa los campos de Batch, Color, Altura y Densidad.")
+            else:
+                st.session_state.confirmar_edicion = True
+                st.rerun()
+
+        # --- BLOQUE DE CONFIRMACIÓN (SÍ / NO) ---
+        if st.session_state.confirmar_edicion:
+            st.warning(f"❓ ¿Está seguro de que desea modificar el Registro No. {id_a_editar}?")
+            
+            col_si_ed, col_no_ed = st.columns(2)
+            with col_si_ed:
+                btn_si_ed = st.button("✔️ SÍ, actualizar", use_container_width=True, key="btn_si_ed")
+            with col_no_ed:
+                btn_no_ed = st.button("❌ NO, cancelar", use_container_width=True, key="btn_no_ed")
+
+            if btn_si_ed:
+                # Actualizamos la fila correspondiente en el DataFrame
+                df_editar.loc[df_editar["ID"] == id_a_editar, "BATCH_PREP"] = batch_preparadop_edit
+                df_editar.loc[df_editar["ID"] == id_a_editar, "TIPO_ESMALTE_PREP"] = tipo_esmalte_preparadop_edit
+                df_editar.loc[df_editar["ID"] == id_a_editar, "COLOR_PREP"] = color_preparadop_edit
+                df_editar.loc[df_editar["ID"] == id_a_editar, "ALTURA_PREP"] = altura_preparadop_edit
+                df_editar.loc[df_editar["ID"] == id_a_editar, "DENSIDAD(KG/L)_PREP"] = densidad_preparadop_edit
+                df_editar.loc[df_editar["ID"] == id_a_editar, "VOLUMEN(L)_PREP"] = volumen_preparadop_final_edit
+                df_editar.loc[df_editar["ID"] == id_a_editar, "KG_HUMEDOS_PREP"] = kg_humedos_preparadop_cal_edit
+                df_editar.loc[df_editar["ID"] == id_a_editar, "KG_SECOS_PREP"] = kg_preparadop_secos_edit
+
+                guardar_datos1(df_editar)
+                st.success(f"✅ Registro #{id_a_editar} actualizado exitosamente.")
+                st.session_state.confirmar_edicion = False
+                time.sleep(2)
+                st.rerun()
+
+            if btn_no_ed:
+                st.session_state.confirmar_edicion = False
+                st.rerun()
+
+
+
+
+# ********************************************************************************************************
+# ********************************************************************************************************
+# --- PESTAÑA: ELIMINAR REGISTRO ---
+# ********************************************************************************************************
+# ********************************************************************************************************
+with tab_del:
+    st.write("")
+    st.markdown("<h3 style='text-align: center; color:darkred ;'>🗑️ ELIMINAR REGISTRO</h3>", unsafe_allow_html=True)
+    df_eliminar = cargar_datos1()
+
+    if df_eliminar.empty:
+        st.warning("📭 No hay registros para eliminar.")
+    else:
+        # Selector de ID a eliminar
+        lista_ids_del = df_eliminar["ID"].tolist()
+        id_a_eliminar = st.selectbox("Selecciona el ID del registro que deseas eliminar:", options=lista_ids_del, key="sb_id_eliminar")
+
+        # Mostrar la información del registro seleccionado antes de borrarlo
+        fila_a_borrar = df_eliminar[df_eliminar["ID"] == id_a_eliminar]
+        st.write("📋 **Datos del registro seleccionado:**")
+        st.dataframe(fila_a_borrar.style.format(precision=0), use_container_width=True, hide_index=True)
+
+        # Inicializar la variable de estado para la confirmación si no existe
+        if "confirmar_eliminacion" not in st.session_state:
+            st.session_state.confirmar_eliminacion = False
+
+        # Botón principal para iniciar el proceso de eliminación
+        btn_delete = st.button("Eliminar Registro", disabled=st.session_state.confirmar_eliminacion, key="btn_eliminar")
+        if btn_delete:
+            st.session_state.confirmar_eliminacion = True
+            st.rerun()
+
+        # --- BLOQUE DE CONFIRMACIÓN (SÍ / NO) ---
+        if st.session_state.confirmar_eliminacion:
+            st.warning(f"⚠️ ¿Está completamente seguro de que desea ELIMINAR permanentemente el Registro No. {id_a_eliminar}?")
+            
+            col_si_del, col_no_del = st.columns(2)
+            with col_si_del:
+                btn_si_del = st.button("✔️ SÍ, eliminar", use_container_width=True, key="btn_si_del")
+            with col_no_del:
+                btn_no_del = st.button("❌ NO, cancelar", use_container_width=True, key="btn_no_del")
+
+            if btn_si_del:
+                # Filtrar el DataFrame manteniendo todos los registros excepto el seleccionado
+                df_final_del = df_eliminar[df_eliminar["ID"] != id_a_eliminar]
+                guardar_datos1(df_final_del)
+                
+                st.success(f"🗑️ Registro #{id_a_eliminar} eliminado exitosamente.")
+                st.session_state.confirmar_eliminacion = False
+                time.sleep(2)
+                st.rerun()
+
+            if btn_no_del:
+                st.session_state.confirmar_eliminacion = False
+                st.rerun()

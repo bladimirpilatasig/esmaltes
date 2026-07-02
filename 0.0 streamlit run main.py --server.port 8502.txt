@@ -1,0 +1,7 @@
+cd D:\A BLADIMIR\RESPALDOS\2025\PYTHON\VISUAL STUDIO CODE\6.- STREAMLIT\6.3 BLADIMIR\5_DIANA
+
+streamlit run a_main.py --server.port 8502
+
+agregar tab
+retroceder shift+tab
+

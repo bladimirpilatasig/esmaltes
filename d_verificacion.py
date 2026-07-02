@@ -339,3 +339,178 @@ with tab_view:
     else:
         st.info("No hay datos que coincidan con la búsqueda.")
 
+
+
+
+
+# ********************************************************************************************************
+# ********************************************************************************************************
+# --- PESTAÑA: EDITAR REGISTRO ---
+# ********************************************************************************************************
+# ********************************************************************************************************
+with tab_edit:
+    df_editar = cargar_datos3()
+    st.markdown("<h3 style='text-align: center; color:darkblue ;'>✏️ EDITAR REGISTRO EXISTENTE</h3>", unsafe_allow_html=True)
+    
+    if df_editar.empty:
+        st.warning("📭 No hay registros para editar.")
+    else:
+        
+        
+        # Selector para elegir el ID del registro a editar
+        lista_ids = df_editar["ID"].tolist()
+        id_seleccionar = st.selectbox("Selecciona el ID del registro a EDITAR:", options=lista_ids, key="sb_id_editar")
+        
+        # Obtener los datos actuales del registro seleccionado
+        fila_actual = df_editar[df_editar["ID"] == id_seleccionar].iloc[0]
+        
+        # --- FORMULARIO DE EDICIÓN DE DATOS ---
+        batch_edit_texto = st.text_input('BATCH (No.)', value=str(fila_actual["BATCH_VERI"]), key="txt_batch_edit")
+        try:
+            batch_edit_in = float(batch_edit_texto.replace(',', '.')) if batch_edit_texto else 0.000
+        except ValueError:
+            batch_edit_in = 0.000
+            st.error("⚠️ Por favor, ingresa un número válido en el BATCH.")
+            
+        # Buscar índice por defecto para el color
+        try:
+            idx_color = OPCIONES_COLOR_PREPARADO.index(fila_actual["COLOR_VERI"])
+        except ValueError:
+            idx_color = 0
+        color_edit_in = st.selectbox("COLOR", OPCIONES_COLOR_PREPARADO, index=idx_color, key="sb_color_edit")
+        
+        # Buscar índice por defecto para el tipo de esmalte
+        try:
+            idx_tipo = OPCIONES_TIPO_ESMALTE_VERIFICACION.index(fila_actual["TIPO_ESMALTE_VERI"])
+        except ValueError:
+            idx_tipo = 0
+        tipo_esmalte_edit_in = st.selectbox("TIPO DE ESMALTE", OPCIONES_TIPO_ESMALTE_VERIFICACION, index=idx_tipo, key="sb_tipo_esm_edit")
+        
+        volumen_edit_texto = st.text_input('VOLUMEN (lt)', value=str(fila_actual["VOLUMEN_VERI"]), key="txt_volumen_edit")
+        try:
+            volumen_edit_in = float(volumen_edit_texto.replace(',', '.')) if volumen_edit_texto else 0.000
+        except ValueError:
+            volumen_edit_in = 0.000
+            st.error("⚠️ Por favor, ingresa un número válido en el VOLUMEN.")
+            
+        densidad_edit_texto = st.text_input('DENSIDAD (Kg/lt)', value=str(fila_actual["DENSIDAD(KG/L)_VERI"]), key="txt_densidad_edit")
+        try:
+            densidad_edit_in = float(densidad_edit_texto.replace(',', '.')) if densidad_edit_texto else 0.000
+        except ValueError:
+            densidad_edit_in = 0.000
+            st.error("⚠️ Por favor, ingresa un número válido en la DENSIDAD.")
+            
+        # --- BLOQUE DE CÁLCULOS EN TIEMPO REAL ---
+        pendiente = 1.5419
+        ordenada_origen = -1.5435
+        kg_edit_secos = volumen_edit_in * ((pendiente * densidad_edit_in) + ordenada_origen)
+        
+        st.info(f"📐 **Nuevos Kilogramos Secos de verificación (Kg):** {kg_edit_secos:.2f}")
+        
+        # Inicializar estado de confirmación para edición
+        if "confirmar_edit_veri" not in st.session_state:
+            st.session_state.confirmar_edit_veri = False
+            
+        btn_update = st.button("Actualizar Registro", disabled=st.session_state.confirmar_edit_veri, key="btn_update_veri")
+        if btn_update:
+            if not batch_edit_in or not tipo_esmalte_edit_in or not volumen_edit_in or not densidad_edit_in:
+                st.error("⚠️ Error: Por favor completa todos los campos con valores válidos.")
+            else:
+                st.session_state.confirmar_edit_veri = True
+                st.rerun()
+                
+        # --- BLOQUE DE CONFIRMACIÓN (SÍ / NO) ---
+        if st.session_state.confirmar_edit_veri:
+            st.warning(f"❓ ¿Está seguro de que desea guardar los cambios en el Registro No. {id_seleccionar}?")
+            col_si_ed, col_no_ed = st.columns(2)
+            
+            with col_si_ed:
+                btn_si_ed = st.button("✔️ SÍ, actualizar", use_container_width=True, key="btn_si_edit_veri")
+            with col_no_ed:
+                btn_no_ed = st.button("❌ NO, cancelar", use_container_width=True, key="btn_no_edit_veri")
+                
+            if btn_si_ed:
+                # Modificar fila en el DataFrame original
+                idx_target = df_editar[df_editar["ID"] == id_seleccionar].index[0]
+                df_editar.at[idx_target, "BATCH_VERI"] = batch_edit_in
+                df_editar.at[idx_target, "COLOR_VERI"] = color_edit_in
+                df_editar.at[idx_target, "TIPO_ESMALTE_VERI"] = tipo_esmalte_edit_in
+                df_editar.at[idx_target, "VOLUMEN_VERI"] = volumen_edit_in
+                df_editar.at[idx_target, "DENSIDAD(KG/L)_VERI"] = densidad_edit_in
+                df_editar.at[idx_target, "KG_SECOS_VERI"] = kg_edit_secos
+                
+                guardar_datos3(df_editar)
+                st.success(f"✅ Registro #{id_seleccionar} actualizado exitosamente.")
+                st.session_state.confirmar_edit_veri = False
+                time.sleep(2)
+                st.rerun()
+                
+            if btn_no_ed:
+                st.session_state.confirmar_edit_veri = False
+                st.rerun()
+
+
+
+
+
+# ********************************************************************************************************
+# ********************************************************************************************************
+# --- PESTAÑA: ELIMINAR REGISTRO ---
+# ********************************************************************************************************
+# ********************************************************************************************************
+with tab_del:
+    df_eliminar = cargar_datos3()
+    st.markdown("<h3 style='text-align: center; color:darkred ;'>🗑️ ELIMINAR REGISTRO</h3>", unsafe_allow_html=True)
+    
+    if df_eliminar.empty:
+        st.warning("📭 No hay registros para eliminar.")
+    else:
+        
+        
+        # Selector para elegir el ID del registro a borrar
+        lista_ids_del = df_eliminar["ID"].tolist()
+        id_eliminar_sel = st.selectbox("Selecciona el ID del registro que deseas ELIMINAR:", options=lista_ids_del, key="sb_id_eliminar")
+        
+        # Extraer y estructurar la fila como un DataFrame individual para mostrarlo en formato tabla
+        fila_tabla_del = df_eliminar[df_eliminar["ID"] == id_eliminar_sel]
+        
+        st.write("📋 **Vista previa del registro seleccionado para eliminación:**")
+        # Mostrar en formato tabla exacta sin índices antes de realizar la acción
+        st.dataframe(
+            fila_tabla_del.style.format(precision=0),
+            use_container_width=True,
+            hide_index=True
+        )
+        
+        # Inicializar estado de confirmación para eliminación
+        if "confirmar_del_veri" not in st.session_state:
+            st.session_state.confirmar_del_veri = False
+            
+        btn_delete = st.button("Eliminar Registro", disabled=st.session_state.confirmar_del_veri, key="btn_delete_veri")
+        if btn_delete:
+            st.session_state.confirmar_del_veri = True
+            st.rerun()
+            
+        # --- BLOQUE DE CONFIRMACIÓN (SÍ / NO) ---
+        if st.session_state.confirmar_del_veri:
+            st.error(f"🚨 ALERTAL: ¿Está completamente seguro de que desea ELIMINAR permanentemente el Registro No. {id_eliminar_sel}?")
+            col_si_del, col_no_del = st.columns(2)
+            
+            with col_si_del:
+                btn_si_del = st.button("💥 SÍ, eliminar permanentemente", use_container_width=True, key="btn_si_del_veri")
+            with col_no_del:
+                btn_no_del = st.button("❌ NO, cancelar", use_container_width=True, key="btn_no_del_veri")
+                
+            if btn_si_del:
+                # Filtrar el DataFrame para remover la fila correspondiente
+                df_final_del = df_eliminar[df_eliminar["ID"] != id_eliminar_sel]
+                guardar_datos3(df_final_del)
+                
+                st.success(f"🗑️ Registro #{id_eliminar_sel} eliminado exitosamente.")
+                st.session_state.confirmar_del_veri = False
+                time.sleep(2)
+                st.rerun()
+                
+            if btn_no_del:
+                st.session_state.confirmar_del_veri = False
+                st.rerun()
